@@ -1,0 +1,66 @@
+export interface IbanResult {
+  valid: boolean;
+  formatted: string;
+  countryCode: string;
+  error: string | null;
+}
+
+const COUNTRY_LENGTHS: Record<string, number> = {
+  AL: 28, AD: 24, AT: 20, AZ: 28, BH: 22, BY: 28, BE: 16, BA: 20,
+  BR: 29, BG: 22, CR: 22, HR: 21, CY: 28, CZ: 24, DK: 18, DO: 28,
+  TL: 23, EG: 29, SV: 28, EE: 20, FO: 18, FI: 18, FR: 27, GE: 22,
+  DE: 22, GI: 23, GR: 27, GL: 18, GT: 28, HU: 28, IS: 26, IQ: 23,
+  IE: 22, IL: 23, IT: 27, JO: 30, KZ: 20, XK: 20, KW: 30, LV: 21,
+  LB: 28, LI: 21, LT: 20, LU: 20, MK: 19, MT: 31, MR: 27, MU: 30,
+  MC: 27, MD: 24, ME: 22, NL: 18, NO: 15, PK: 24, PS: 29, PL: 28,
+  PT: 25, QA: 29, RO: 24, LC: 32, SM: 27, SA: 24, RS: 22, SC: 31,
+  SK: 24, SI: 19, ES: 24, SD: 18, SE: 24, CH: 21, TN: 24, TR: 26,
+  UA: 29, AE: 23, GB: 22, VA: 22, VG: 24,
+};
+
+function mod97(iban: string): number {
+  let remainder = '';
+  for (const char of iban) {
+    remainder += char;
+    const num = parseInt(remainder, 10);
+    remainder = (num % 97).toString();
+  }
+  return parseInt(remainder, 10);
+}
+
+export function validateIban(input: string): IbanResult {
+  const cleaned = input.replace(/\s/g, '').toUpperCase();
+  const countryCode = cleaned.slice(0, 2);
+  const expectedLength = COUNTRY_LENGTHS[countryCode];
+
+  if (!expectedLength) {
+    return { valid: false, error: `Unknown country code: ${countryCode}`, formatted: cleaned, countryCode };
+  }
+
+  if (cleaned.length !== expectedLength) {
+    return {
+      valid: false,
+      error: `Invalid length: expected ${expectedLength}, got ${cleaned.length}`,
+      formatted: cleaned,
+      countryCode,
+    };
+  }
+
+  const rearranged = cleaned.slice(4) + cleaned.slice(0, 4);
+  const numeric = rearranged
+    .split('')
+    .map((c) => {
+      const code = c.charCodeAt(0);
+      return code >= 65 && code <= 90 ? (code - 55).toString() : c;
+    })
+    .join('');
+
+  const valid = mod97(numeric) === 1;
+  const formatted = cleaned.replace(/(.{4})/g, '$1 ').trim();
+
+  return { valid, formatted, countryCode, error: valid ? null : 'Check digits are invalid' };
+}
+
+export function formatIban(iban: string): string {
+  return iban.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim();
+}
